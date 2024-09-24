@@ -103,6 +103,7 @@ This project is licensed under the MIT License—see the [LICENSE](/LICENSE) fil
 [![Telegram](https://img.shields.io/badge/Telegram-Chat-blue.svg)](https://t.me/AshokShau)
 
 
-## Thanks
-- [Ashok Shau](https://github.com/AshokShau) for the project.
-- [PaulSonOfLars](https://github.com/PaulSonOfLars) for the [GoTgBot](https://github.com/PaulSonOfLars/gotgbot) library and [Api](https://github.com/PaulSonOfLars/telegram-bot-api-spec/raw/main/api.json).
+## Acknowledgments
+- **[Ashok Shau](https://github.com/AshokShau)**: For creating and maintaining this [project](https://github.com/AshokShau/BotApiDocs), which provides a solid foundation for building Telegram bots.
+
+- **[PaulSonOfLars](https://github.com/PaulSonOfLars)**: For the invaluable [GoTgBot](https://github.com/PaulSonOfLars/gotgbot) library, which simplifies Telegram bot development in Go, and for the [API specification](https://github.com/PaulSonOfLars/telegram-bot-api-spec/raw/main/api.json) that serves as a reference for bot methods and types.
