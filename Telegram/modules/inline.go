@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +15,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
+
+const maxMessageLength = 4096 // Telegram's maximum message length
 
 // apiCache is a global cache for storing API methods and types.
 var apiCache struct {
@@ -55,10 +58,6 @@ func fetchAPI() error {
 		return fmt.Errorf("failed to fetch API: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
 
 	var apiDocs struct {
 		Methods map[string]Method `json:"methods"`
@@ -128,7 +127,7 @@ func sendEmptyQueryResponse(bot *gotgbot.Bot, ctx *ext.Context) error {
 		IsPersonal: true,
 		CacheTime:  5,
 		Button: &gotgbot.InlineQueryResultsButton{
-			Text:           "Type '<your_query>' to search!",
+			Text:           "Type 'your_query' to search!",
 			StartParameter: "start",
 		},
 	})
@@ -169,35 +168,43 @@ func sendNoResultsResponse(bot *gotgbot.Bot, ctx *ext.Context, query string) err
 func buildMethodMessage(method Method) string {
 	var msgBuilder strings.Builder
 	msgBuilder.WriteString(fmt.Sprintf("<b>%s</b>\n", method.Name))
-	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", strings.Join(method.Description, ", ")))
+	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", sanitizeHTML(strings.Join(method.Description, ", "))))
 	msgBuilder.WriteString("<b>Returns:</b> " + strings.Join(method.Returns, ", ") + "\n")
 
 	if len(method.Fields) > 0 {
 		msgBuilder.WriteString("<b>Fields:</b>\n")
 		for _, field := range method.Fields {
 			msgBuilder.WriteString(fmt.Sprintf("<code>%s</code> (<b>%s</b>) - Required: <code>%t</code>\n", field.Name, strings.Join(field.Types, ", "), field.Required))
-			msgBuilder.WriteString(field.Description + "\n\n")
+			msgBuilder.WriteString(sanitizeHTML(field.Description) + "\n\n")
 		}
 	}
 
-	return msgBuilder.String()
+	message := msgBuilder.String()
+	if len(message) > maxMessageLength {
+		return fmt.Sprintf("See full documentation: %s", method.Href)
+	}
+	return message
 }
 
 // buildTypeMessage builds a message string for a given API type.
 func buildTypeMessage(typ Type) string {
 	var msgBuilder strings.Builder
 	msgBuilder.WriteString(fmt.Sprintf("<b>%s</b>\n", typ.Name))
-	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", strings.Join(typ.Description, ", ")))
+	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", sanitizeHTML(strings.Join(typ.Description, ", "))))
 
 	if len(typ.Fields) > 0 {
 		msgBuilder.WriteString("<b>Fields:</b>\n")
 		for _, field := range typ.Fields {
 			msgBuilder.WriteString(fmt.Sprintf("<code>%s</code> (<b>%s</b>) - Required: <code>%t</code>\n", field.Name, strings.Join(field.Types, ", "), field.Required))
-			msgBuilder.WriteString(field.Description + "\n\n")
+			msgBuilder.WriteString(sanitizeHTML(field.Description) + "\n\n")
 		}
 	}
 
-	return msgBuilder.String()
+	message := msgBuilder.String()
+	if len(message) > maxMessageLength {
+		return fmt.Sprintf("See full documentation: %s", typ.Href)
+	}
+	return message
 }
 
 // createInlineResult creates an inline query result for a given API method or type.
@@ -225,7 +232,7 @@ func createInlineResult(title, url, message, methodUrl string) gotgbot.InlineQue
 func noResultsArticle(query string) gotgbot.InlineQueryResult {
 	ok := "botapi"
 	return gotgbot.InlineQueryResultArticle{
-		Id:    "no_results",
+		Id:    strconv.Itoa(rand.Intn(100000)),
 		Title: "No Results Found!",
 		InputMessageContent: gotgbot.InputTextMessageContent{
 			MessageText: fmt.Sprintf("<i>👋 Sorry, I couldn't find any results for '%s'. Try searching with a different keyword!</i>", query),
@@ -238,4 +245,11 @@ func noResultsArticle(query string) gotgbot.InlineQueryResult {
 			},
 		},
 	}
+}
+
+// sanitizeHTML removes unsupported HTML tags from the message
+func sanitizeHTML(input string) string {
+	// This regex matches any HTML tags that are not supported
+	re := regexp.MustCompile(`<[^>]*>`)
+	return re.ReplaceAllString(input, "")
 }
