@@ -25,5 +25,6 @@ func newDispatcher() *ext.Dispatcher {
 
 func loadModules(d *ext.Dispatcher) {
 	d.AddHandler(handlers.NewCommand("start", start))
+	d.AddHandler(handlers.NewCommand("ping", ping))
 	d.AddHandler(handlers.NewInlineQuery(inlinequery.All, inlineQueryHandler))
 }

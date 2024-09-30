@@ -3,9 +3,11 @@ package modules
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
+
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,7 +18,10 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const maxMessageLength = 4096 // Telegram's maximum message length
+const (
+	maxMessageLength = 4096 // Telegram's maximum message length
+	apiURL           = "https://github.com/PaulSonOfLars/telegram-bot-api-spec/raw/main/api.json"
+)
 
 // apiCache is a global cache for storing API methods and types.
 var apiCache struct {
@@ -25,7 +30,6 @@ var apiCache struct {
 	Types   map[string]Type
 }
 
-// Method Type, Field structs remain unchanged
 type Method struct {
 	Name        string   `json:"name"`
 	Description []string `json:"description"`
@@ -51,11 +55,13 @@ type Field struct {
 // fetchAPI fetches the API documentation from a remote source and updates the apiCache.
 func fetchAPI() error {
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get("https://github.com/PaulSonOfLars/telegram-bot-api-spec/raw/main/api.json")
+	resp, err := client.Get(apiURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	var apiDocs struct {
 		Methods map[string]Method `json:"methods"`
@@ -67,9 +73,9 @@ func fetchAPI() error {
 	}
 
 	apiCache.Lock()
+	defer apiCache.Unlock()
 	apiCache.Methods = apiDocs.Methods
 	apiCache.Types = apiDocs.Types
-	apiCache.Unlock()
 
 	return nil
 }
@@ -86,6 +92,13 @@ func StartAPICacheUpdater(interval time.Duration) {
 	}()
 }
 
+// getAPICache returns a snapshot of the current API cache.
+func getAPICache() (map[string]Method, map[string]Type) {
+	apiCache.RLock()
+	defer apiCache.RUnlock()
+	return apiCache.Methods, apiCache.Types
+}
+
 // inlineQueryHandler handles inline queries from the bot.
 func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	query := strings.TrimSpace(ctx.InlineQuery.Query)
@@ -100,11 +113,7 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		query = kueri
 	}
 
-	apiCache.RLock()
-	methods := apiCache.Methods
-	types := apiCache.Types
-	apiCache.RUnlock()
-
+	methods, types := getAPICache()
 	results := searchAPI(query, methods, types)
 
 	if len(results) == 0 {
@@ -135,19 +144,20 @@ func sendEmptyQueryResponse(bot *gotgbot.Bot, ctx *ext.Context) error {
 // searchAPI searches the API methods and types for the given query.
 func searchAPI(query string, methods map[string]Method, types map[string]Type) []gotgbot.InlineQueryResult {
 	var results []gotgbot.InlineQueryResult
+	lowerQuery := strings.ToLower(query)
 
-	search := func(name string, href string, msg string) {
+	search := func(name, href, msg string) {
 		results = append(results, createInlineResult(name, href, msg, href))
 	}
 
 	for name, method := range methods {
-		if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {
+		if strings.Contains(strings.ToLower(name), lowerQuery) {
 			search(name, method.Href, buildMethodMessage(method))
 		}
 	}
 
 	for name, typ := range types {
-		if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {
+		if strings.Contains(strings.ToLower(name), lowerQuery) {
 			search(name, typ.Href, buildTypeMessage(typ))
 		}
 	}
@@ -159,7 +169,7 @@ func searchAPI(query string, methods map[string]Method, types map[string]Type) [
 func sendNoResultsResponse(bot *gotgbot.Bot, ctx *ext.Context, query string) error {
 	_, err := ctx.InlineQuery.Answer(bot, []gotgbot.InlineQueryResult{noResultsArticle(query)}, &gotgbot.AnswerInlineQueryOpts{
 		IsPersonal: true,
-		CacheTime:  5,
+		CacheTime:  500,
 	})
 	return err
 }
@@ -194,6 +204,7 @@ func buildMessage(name string, description []string, returns []string, fields []
 	if len(message) > maxMessageLength {
 		return fmt.Sprintf("See full documentation: %s", href)
 	}
+
 	return message
 }
 
@@ -237,7 +248,7 @@ func noResultsArticle(query string) gotgbot.InlineQueryResult {
 	}
 }
 
-// sanitizeHTML removes unsupported HTML tags from the message
+// sanitizeHTML removes unsupported HTML tags from the message.
 func sanitizeHTML(input string) string {
 	re := regexp.MustCompile(`<[^>]*>`)
 	return re.ReplaceAllString(input, "")
