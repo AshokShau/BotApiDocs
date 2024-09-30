@@ -25,7 +25,7 @@ var apiCache struct {
 	Types   map[string]Type
 }
 
-// Method represents an API method with its details.
+// Method Type, Field structs remain unchanged
 type Method struct {
 	Name        string   `json:"name"`
 	Description []string `json:"description"`
@@ -34,7 +34,6 @@ type Method struct {
 	Fields      []Field  `json:"fields,omitempty"`
 }
 
-// Type represents an API type with its details.
 type Type struct {
 	Name        string   `json:"name"`
 	Description []string `json:"description"`
@@ -42,7 +41,6 @@ type Type struct {
 	Fields      []Field  `json:"fields,omitempty"`
 }
 
-// Field represents a field in an API method or type.
 type Field struct {
 	Name        string   `json:"name"`
 	Types       []string `json:"types"`
@@ -93,13 +91,13 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	query := strings.TrimSpace(ctx.InlineQuery.Query)
 	parts := strings.Fields(query)
 
-	if len(parts) < 1 {
+	if len(parts) == 0 {
 		return sendEmptyQueryResponse(bot, ctx)
 	}
 
-	kueri := strings.Join(parts, " ")
-	if strings.ToLower(parts[0]) == "botapi" {
-		kueri = strings.Join(parts[1:], " ")
+	kueri := strings.Join(parts[1:], " ")
+	if strings.EqualFold(parts[0], "botapi") {
+		query = kueri
 	}
 
 	apiCache.RLock()
@@ -107,10 +105,10 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	types := apiCache.Types
 	apiCache.RUnlock()
 
-	results := searchAPI(kueri, methods, types)
+	results := searchAPI(query, methods, types)
 
 	if len(results) == 0 {
-		return sendNoResultsResponse(bot, ctx, kueri)
+		return sendNoResultsResponse(bot, ctx, query)
 	}
 
 	if len(results) > 50 {
@@ -123,7 +121,7 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 // sendEmptyQueryResponse sends a response for an empty inline query.
 func sendEmptyQueryResponse(bot *gotgbot.Bot, ctx *ext.Context) error {
-	_, err := ctx.InlineQuery.Answer(bot, []gotgbot.InlineQueryResult{}, &gotgbot.AnswerInlineQueryOpts{
+	_, err := ctx.InlineQuery.Answer(bot, nil, &gotgbot.AnswerInlineQueryOpts{
 		IsPersonal: true,
 		CacheTime:  5,
 		Button: &gotgbot.InlineQueryResultsButton{
@@ -138,17 +136,19 @@ func sendEmptyQueryResponse(bot *gotgbot.Bot, ctx *ext.Context) error {
 func searchAPI(query string, methods map[string]Method, types map[string]Type) []gotgbot.InlineQueryResult {
 	var results []gotgbot.InlineQueryResult
 
+	search := func(name string, href string, msg string) {
+		results = append(results, createInlineResult(name, href, msg, href))
+	}
+
 	for name, method := range methods {
 		if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {
-			msg := buildMethodMessage(method)
-			results = append(results, createInlineResult(name, method.Href, msg, method.Href))
+			search(name, method.Href, buildMethodMessage(method))
 		}
 	}
 
 	for name, typ := range types {
 		if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {
-			msg := buildTypeMessage(typ)
-			results = append(results, createInlineResult(name, typ.Href, msg, typ.Href))
+			search(name, typ.Href, buildTypeMessage(typ))
 		}
 	}
 
@@ -166,35 +166,25 @@ func sendNoResultsResponse(bot *gotgbot.Bot, ctx *ext.Context, query string) err
 
 // buildMethodMessage builds a message string for a given API method.
 func buildMethodMessage(method Method) string {
-	var msgBuilder strings.Builder
-	msgBuilder.WriteString(fmt.Sprintf("<b>%s</b>\n", method.Name))
-	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", sanitizeHTML(strings.Join(method.Description, ", "))))
-	msgBuilder.WriteString("<b>Returns:</b> " + strings.Join(method.Returns, ", ") + "\n")
-
-	if len(method.Fields) > 0 {
-		msgBuilder.WriteString("<b>Fields:</b>\n")
-		for _, field := range method.Fields {
-			msgBuilder.WriteString(fmt.Sprintf("<code>%s</code> (<b>%s</b>) - Required: <code>%t</code>\n", field.Name, strings.Join(field.Types, ", "), field.Required))
-			msgBuilder.WriteString(sanitizeHTML(field.Description) + "\n\n")
-		}
-	}
-
-	message := msgBuilder.String()
-	if len(message) > maxMessageLength {
-		return fmt.Sprintf("See full documentation: %s", method.Href)
-	}
-	return message
+	return buildMessage(method.Name, method.Description, method.Returns, method.Fields, method.Href)
 }
 
 // buildTypeMessage builds a message string for a given API type.
 func buildTypeMessage(typ Type) string {
-	var msgBuilder strings.Builder
-	msgBuilder.WriteString(fmt.Sprintf("<b>%s</b>\n", typ.Name))
-	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", sanitizeHTML(strings.Join(typ.Description, ", "))))
+	return buildMessage(typ.Name, typ.Description, nil, typ.Fields, typ.Href)
+}
 
-	if len(typ.Fields) > 0 {
+func buildMessage(name string, description []string, returns []string, fields []Field, href string) string {
+	var msgBuilder strings.Builder
+	msgBuilder.WriteString(fmt.Sprintf("<b>%s</b>\n", name))
+	msgBuilder.WriteString(fmt.Sprintf("Description: %s\n\n", sanitizeHTML(strings.Join(description, ", "))))
+	if returns != nil {
+		msgBuilder.WriteString("<b>Returns:</b> " + strings.Join(returns, ", ") + "\n")
+	}
+
+	if len(fields) > 0 {
 		msgBuilder.WriteString("<b>Fields:</b>\n")
-		for _, field := range typ.Fields {
+		for _, field := range fields {
 			msgBuilder.WriteString(fmt.Sprintf("<code>%s</code> (<b>%s</b>) - Required: <code>%t</code>\n", field.Name, strings.Join(field.Types, ", "), field.Required))
 			msgBuilder.WriteString(sanitizeHTML(field.Description) + "\n\n")
 		}
@@ -202,7 +192,7 @@ func buildTypeMessage(typ Type) string {
 
 	message := msgBuilder.String()
 	if len(message) > maxMessageLength {
-		return fmt.Sprintf("See full documentation: %s", typ.Href)
+		return fmt.Sprintf("See full documentation: %s", href)
 	}
 	return message
 }
@@ -215,8 +205,9 @@ func createInlineResult(title, url, message, methodUrl string) gotgbot.InlineQue
 		Url:     url,
 		HideUrl: true,
 		InputMessageContent: gotgbot.InputTextMessageContent{
-			MessageText: message,
-			ParseMode:   gotgbot.ParseModeHTML,
+			MessageText:        message,
+			ParseMode:          gotgbot.ParseModeHTML,
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{PreferSmallMedia: true},
 		},
 		Description: "View more details",
 		ReplyMarkup: &gotgbot.InlineKeyboardMarkup{
@@ -230,7 +221,6 @@ func createInlineResult(title, url, message, methodUrl string) gotgbot.InlineQue
 
 // noResultsArticle creates an inline query result indicating no results were found.
 func noResultsArticle(query string) gotgbot.InlineQueryResult {
-	ok := "botapi"
 	return gotgbot.InlineQueryResultArticle{
 		Id:    strconv.Itoa(rand.Intn(100000)),
 		Title: "No Results Found!",
@@ -241,7 +231,7 @@ func noResultsArticle(query string) gotgbot.InlineQueryResult {
 		Description: "No results found for your query.",
 		ReplyMarkup: &gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-				{{Text: "Search Again", SwitchInlineQueryCurrentChat: &ok}},
+				{{Text: "Search Again", SwitchInlineQueryCurrentChat: &query}},
 			},
 		},
 	}
@@ -249,7 +239,6 @@ func noResultsArticle(query string) gotgbot.InlineQueryResult {
 
 // sanitizeHTML removes unsupported HTML tags from the message
 func sanitizeHTML(input string) string {
-	// This regex matches any HTML tags that are not supported
 	re := regexp.MustCompile(`<[^>]*>`)
 	return re.ReplaceAllString(input, "")
 }
