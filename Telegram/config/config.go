@@ -12,11 +12,13 @@ var (
 	OwnerId    int64
 	WebhookUrl string
 	Port       string
+	VERCEL     string
 )
 
 func init() {
 	Token = os.Getenv("TOKEN")
 	OwnerId = toInt64(os.Getenv("OWNER_ID"))
+	VERCEL = os.Getenv("VERCEL")
 	WebhookUrl = os.Getenv("WEBHOOK_URL")
 	Port = os.Getenv("PORT")
 }

@@ -3,11 +3,10 @@ package modules
 import (
 	"encoding/json"
 	"fmt"
-	"io"
+	"github.com/AshokShau/BotApiDocs/Telegram/config"
 	"log"
 	"math/rand"
 	"net/http"
-
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,6 +51,11 @@ type Field struct {
 	Description string   `json:"description"`
 }
 
+// isVercel checks if the application is running on Vercel.
+func isVercel() bool {
+	return config.VERCEL == "1"
+}
+
 // fetchAPI fetches the API documentation from a remote source and updates the apiCache.
 func fetchAPI() error {
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -59,9 +63,7 @@ func fetchAPI() error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch API: %w", err)
 	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
+	defer resp.Body.Close()
 
 	var apiDocs struct {
 		Methods map[string]Method `json:"methods"`
@@ -84,8 +86,10 @@ func fetchAPI() error {
 func StartAPICacheUpdater(interval time.Duration) {
 	go func() {
 		for {
-			if err := fetchAPI(); err != nil {
-				log.Println("Error updating API documentation:", err)
+			if !isVercel() { // Only fetch if not on Vercel
+				if err := fetchAPI(); err != nil {
+					log.Println("Error updating API documentation:", err)
+				}
 			}
 			time.Sleep(interval)
 		}
@@ -93,10 +97,17 @@ func StartAPICacheUpdater(interval time.Duration) {
 }
 
 // getAPICache returns a snapshot of the current API cache.
-func getAPICache() (map[string]Method, map[string]Type) {
+func getAPICache() (map[string]Method, map[string]Type, error) {
+	if isVercel() {
+		// Fetch directly if on Vercel
+		if err := fetchAPI(); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	apiCache.RLock()
 	defer apiCache.RUnlock()
-	return apiCache.Methods, apiCache.Types
+	return apiCache.Methods, apiCache.Types, nil
 }
 
 // inlineQueryHandler handles inline queries from the bot.
@@ -113,7 +124,10 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		query = kueri
 	}
 
-	methods, types := getAPICache()
+	methods, types, err := getAPICache()
+	if err != nil {
+		return fmt.Errorf("failed to get API cache: %w", err)
+	}
 	results := searchAPI(query, methods, types)
 
 	if len(results) == 0 {
@@ -124,7 +138,7 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		results = results[:50]
 	}
 
-	_, err := ctx.InlineQuery.Answer(bot, results, &gotgbot.AnswerInlineQueryOpts{IsPersonal: true})
+	_, err = ctx.InlineQuery.Answer(bot, results, &gotgbot.AnswerInlineQueryOpts{IsPersonal: true})
 	return err
 }
 

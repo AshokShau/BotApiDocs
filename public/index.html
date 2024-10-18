@@ -223,13 +223,12 @@
         errorMessage.textContent = '';
         botTokenInput.classList.remove('border-red-500');
 
-        // let currentUrl = window.location.origin;
-        // // Use default url if null
-        // if (currentUrl === 'null') {
-        //     currentUrl = 'https://botapidocs.abishnoi.me/';
-        // }
+        let currentUrl = window.location.origin;
+        // Use default url if null
+        if (currentUrl === 'null') {
+            currentUrl = 'https://botapidocs.abishnoi.me';
+        }
 
-        const currentUrl = 'https://botapidocs.abishnoi.me/';
         try {
             const resp = await fetch('https://api.telegram.org/bot' + botToken + '/getme', {
                 method: 'POST',
@@ -258,6 +257,7 @@
                     allowed_updates: ['message', 'inline_query']
                 })
             });
+
 
             const data = await response.json();
 
