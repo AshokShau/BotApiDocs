@@ -92,7 +92,20 @@ Contributions are welcome! Here's how you can help:
 
 Please ensure your code follows the project's coding standards and includes appropriate tests.
 </details>
-        
+
+<section>
+<h2>Deploy to Vercel</h2>
+<ol>
+<li>Fork this repository 🍴</li>
+<li>Login your <a href="https://vercel.com/">Vercel</a> account </li>
+<li>Go to your <a href="https://vercel.com/new">Add New Project</a></li>
+<li>Choose the repository you forked</li>
+<li>Configure your Environment Variables: <b>OWNER_ID</b>  &amp; <b>VERCEL=1</b></li>
+<li>Tap on Deploy</li>
+<li><b>Open</b> and Connect Your Bot</li>
+</ol>
+</section>
+
 ## License
 
 This project is licensed under the MIT License—see the [LICENSE](/LICENSE) file for details.
@@ -107,3 +120,4 @@ This project is licensed under the MIT License—see the [LICENSE](/LICENSE) fil
 - **[Ashok Shau](https://github.com/AshokShau)**: For creating and maintaining this [project](https://github.com/AshokShau/BotApiDocs), which provides a solid foundation for building Telegram bots.
 
 - **[PaulSonOfLars](https://github.com/PaulSonOfLars)**: For the invaluable [GoTgBot](https://github.com/PaulSonOfLars/gotgbot) library, which simplifies Telegram bot development in Go, and for the [API specification](https://github.com/PaulSonOfLars/telegram-bot-api-spec/raw/main/api.json) that serves as a reference for bot methods and types.
+

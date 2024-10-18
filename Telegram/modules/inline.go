@@ -53,8 +53,7 @@ type Field struct {
 
 // isVercel checks if the application is running on Vercel.
 func isVercel() bool {
-	//return config.VERCEL == "1"
-	return true
+	return config.Vercel == "1"
 }
 
 // fetchAPI fetches the API documentation from a remote source and updates the apiCache.
@@ -85,8 +84,6 @@ func fetchAPI() error {
 }
 
 func getAPICache() (map[string]Method, map[string]Type, error) {
-	log.Println(config.VERCEL)
-	log.Print("isVercel: ", isVercel())
 	if isVercel() {
 		// Fetch the API on Vercel
 		if err := fetchAPI(); err != nil {
@@ -139,8 +136,6 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	results := searchAPI(query, methods, types)
-	log.Println("Search results for query:", results)
-
 	if len(results) == 0 {
 		return sendNoResultsResponse(bot, ctx, query)
 	}
