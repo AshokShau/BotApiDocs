@@ -54,12 +54,12 @@ type Field struct {
 // isVercel checks if the application is running on Vercel.
 func isVercel() bool {
 	log.Println(config.VERCEL)
-	return config.VERCEL == "1"
+	//return config.VERCEL == "1"
+	return true
 }
 
 // fetchAPI fetches the API documentation from a remote source and updates the apiCache.
 func fetchAPI() error {
-	log.Println("Starting API fetch")
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(apiURL)
 	if err != nil {
@@ -76,14 +76,37 @@ func fetchAPI() error {
 		return fmt.Errorf("failed to decode API response: %w", err)
 	}
 
-	log.Println("Fetched API documentation:", apiDocs) // Log the fetched data
+	// Optionally, log the fetched methods and types
+	log.Println("Fetched API methods:", apiDocs.Methods)
+	log.Println("Fetched API types:", apiDocs.Types)
 
+	// Store the fetched data in cache for non-Vercel environments
 	apiCache.Lock()
 	defer apiCache.Unlock()
 	apiCache.Methods = apiDocs.Methods
 	apiCache.Types = apiDocs.Types
 
 	return nil
+}
+
+func getAPICache() (map[string]Method, map[string]Type, error) {
+	if isVercel() {
+		log.Println("Fetching API directly on Vercel")
+		if err := fetchAPI(); err != nil {
+			log.Println("Error fetching API on Vercel:", err)
+			return nil, nil, err
+		}
+
+		// Return the fetched data directly
+		apiCache.RLock()
+		defer apiCache.RUnlock()
+		return apiCache.Methods, apiCache.Types, nil
+	}
+
+	// Use the cached version if not on Vercel
+	apiCache.RLock()
+	defer apiCache.RUnlock()
+	return apiCache.Methods, apiCache.Types, nil
 }
 
 // StartAPICacheUpdater starts a goroutine that periodically updates the API cache.
@@ -98,20 +121,6 @@ func StartAPICacheUpdater(interval time.Duration) {
 			time.Sleep(interval)
 		}
 	}()
-}
-
-// getAPICache returns a snapshot of the current API cache.
-func getAPICache() (map[string]Method, map[string]Type, error) {
-	if isVercel() {
-		// Fetch directly if on Vercel
-		if err := fetchAPI(); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	apiCache.RLock()
-	defer apiCache.RUnlock()
-	return apiCache.Methods, apiCache.Types, nil
 }
 
 // inlineQueryHandler handles inline queries from the bot.
