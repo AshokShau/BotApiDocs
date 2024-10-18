@@ -53,11 +53,13 @@ type Field struct {
 
 // isVercel checks if the application is running on Vercel.
 func isVercel() bool {
+	log.Println(config.VERCEL)
 	return config.VERCEL == "1"
 }
 
 // fetchAPI fetches the API documentation from a remote source and updates the apiCache.
 func fetchAPI() error {
+	log.Println("Starting API fetch")
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(apiURL)
 	if err != nil {
@@ -73,6 +75,8 @@ func fetchAPI() error {
 	if err := json.NewDecoder(resp.Body).Decode(&apiDocs); err != nil {
 		return fmt.Errorf("failed to decode API response: %w", err)
 	}
+
+	log.Println("Fetched API documentation:", apiDocs) // Log the fetched data
 
 	apiCache.Lock()
 	defer apiCache.Unlock()
@@ -113,8 +117,9 @@ func getAPICache() (map[string]Method, map[string]Type, error) {
 // inlineQueryHandler handles inline queries from the bot.
 func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	query := strings.TrimSpace(ctx.InlineQuery.Query)
-	parts := strings.Fields(query)
+	log.Println("Received inline query:", query)
 
+	parts := strings.Fields(query)
 	if len(parts) == 0 {
 		return sendEmptyQueryResponse(bot, ctx)
 	}
@@ -126,9 +131,12 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	methods, types, err := getAPICache()
 	if err != nil {
-		return fmt.Errorf("failed to get API cache: %w", err)
+		log.Println("Error getting API cache:", err)
+		return sendNoResultsResponse(bot, ctx, query)
 	}
+
 	results := searchAPI(query, methods, types)
+	log.Println("Search results for query:", results)
 
 	if len(results) == 0 {
 		return sendNoResultsResponse(bot, ctx, query)
