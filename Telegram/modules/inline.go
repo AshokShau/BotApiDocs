@@ -53,7 +53,6 @@ type Field struct {
 
 // isVercel checks if the application is running on Vercel.
 func isVercel() bool {
-	log.Println(config.VERCEL)
 	//return config.VERCEL == "1"
 	return true
 }
@@ -76,10 +75,6 @@ func fetchAPI() error {
 		return fmt.Errorf("failed to decode API response: %w", err)
 	}
 
-	// Optionally, log the fetched methods and types
-	log.Println("Fetched API methods:", apiDocs.Methods)
-	log.Println("Fetched API types:", apiDocs.Types)
-
 	// Store the fetched data in cache for non-Vercel environments
 	apiCache.Lock()
 	defer apiCache.Unlock()
@@ -90,8 +85,10 @@ func fetchAPI() error {
 }
 
 func getAPICache() (map[string]Method, map[string]Type, error) {
+	log.Println(config.VERCEL)
+	log.Print("isVercel: ", isVercel())
 	if isVercel() {
-		log.Println("Fetching API directly on Vercel")
+		// Fetch the API on Vercel
 		if err := fetchAPI(); err != nil {
 			log.Println("Error fetching API on Vercel:", err)
 			return nil, nil, err
@@ -113,10 +110,8 @@ func getAPICache() (map[string]Method, map[string]Type, error) {
 func StartAPICacheUpdater(interval time.Duration) {
 	go func() {
 		for {
-			if !isVercel() { // Only fetch if not on Vercel
-				if err := fetchAPI(); err != nil {
-					log.Println("Error updating API documentation:", err)
-				}
+			if err := fetchAPI(); err != nil {
+				log.Println("Error updating API documentation:", err)
 			}
 			time.Sleep(interval)
 		}
@@ -126,7 +121,6 @@ func StartAPICacheUpdater(interval time.Duration) {
 // inlineQueryHandler handles inline queries from the bot.
 func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	query := strings.TrimSpace(ctx.InlineQuery.Query)
-	log.Println("Received inline query:", query)
 
 	parts := strings.Fields(query)
 	if len(parts) == 0 {
