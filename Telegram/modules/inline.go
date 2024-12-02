@@ -216,7 +216,7 @@ func createInlineResult(title, url, message, methodUrl string) gotgbot.InlineQue
 		Url:     url,
 		HideUrl: true,
 		InputMessageContent: gotgbot.InputTextMessageContent{
-			MessageText:        message,
+			MessageText:        fmt.Sprintf("<blockquote expandable>%s</blockquote>", message),
 			ParseMode:          gotgbot.ParseModeHTML,
 			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{PreferSmallMedia: true},
 		},
