@@ -211,10 +211,9 @@ func buildMessage(name string, description []string, returns []string, fields []
 // createInlineResult creates an inline query result for a given API method or type.
 func createInlineResult(title, url, message, methodUrl string) gotgbot.InlineQueryResult {
 	return gotgbot.InlineQueryResultArticle{
-		Id:      strconv.Itoa(rand.Intn(100000)),
-		Title:   title,
-		Url:     url,
-		HideUrl: true,
+		Id:    strconv.Itoa(rand.Intn(100000)),
+		Title: title,
+		Url:   url,
 		InputMessageContent: gotgbot.InputTextMessageContent{
 			MessageText:        fmt.Sprintf("<blockquote expandable>%s</blockquote>", message),
 			ParseMode:          gotgbot.ParseModeHTML,
