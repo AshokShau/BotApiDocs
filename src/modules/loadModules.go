@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/AshokShau/BotApiDocs/Telegram/config"
+	"github.com/AshokShau/BotApiDocs/src/config"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"

@@ -132,7 +132,6 @@ func inlineQueryHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 func sendEmptyQueryResponse(bot *gotgbot.Bot, ctx *ext.Context) error {
 	_, err := ctx.InlineQuery.Answer(bot, nil, &gotgbot.AnswerInlineQueryOpts{
 		IsPersonal: true,
-		CacheTime:  5,
 		Button: &gotgbot.InlineQueryResultsButton{
 			Text:           "Type 'your_query' to search!",
 			StartParameter: "start",
@@ -169,7 +168,6 @@ func searchAPI(query string, methods map[string]Method, types map[string]Type) [
 func sendNoResultsResponse(bot *gotgbot.Bot, ctx *ext.Context, query string) error {
 	_, err := ctx.InlineQuery.Answer(bot, []gotgbot.InlineQueryResult{noResultsArticle(query)}, &gotgbot.AnswerInlineQueryOpts{
 		IsPersonal: true,
-		CacheTime:  500,
 	})
 	return err
 }

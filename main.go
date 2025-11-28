@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/AshokShau/BotApiDocs/Telegram/config"
-	"github.com/AshokShau/BotApiDocs/Telegram/modules"
+	"github.com/AshokShau/BotApiDocs/src/config"
+	"github.com/AshokShau/BotApiDocs/src/modules"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"log"
